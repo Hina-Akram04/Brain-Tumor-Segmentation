@@ -69,3 +69,4 @@ for epoch in range(1, EPOCHS + 1):
         torch.save(model.state_dict(), os.path.join(MODEL_DIR, 'best_model.pth'))
         print(f'  saved new best model (val_dice {val_dice:.4f})')
 
+print('training complete, best val dice:', best_val_dice)
