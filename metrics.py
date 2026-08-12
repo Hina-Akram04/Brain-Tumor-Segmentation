@@ -31,6 +31,7 @@ def pixel_accuracy(preds, targets):
 
 
 def soft_dice_loss(logits, targets, num_classes=4, eps=1e-6):
+    """Differentiable Dice loss for backprop."""
     probs = F.softmax(logits, dim=1)
     targets_onehot = F.one_hot(targets, num_classes).permute(0, 3, 1, 2).float()
     dims = (0, 2, 3)
