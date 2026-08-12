@@ -49,6 +49,6 @@ class UNet(nn.Module):
         d4 = self.dec4(torch.cat([self.up4(b), e4], dim=1))
         d3 = self.dec3(torch.cat([self.up3(d4), e3], dim=1))
         d2 = self.dec2(torch.cat([self.up2(d3), e2], dim=1))
-        d1 = self.dec1(torch.cat([self.up1(d2), e1], dim=2))
+        d1 = self.dec1(torch.cat([self.up1(d2), e1], dim=1))
 
         return self.out_conv(d1)  # (B, num_classes, H, W) raw logits
