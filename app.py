@@ -2,15 +2,16 @@ import os
 import sys
 import tempfile
 
-import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import torch
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 sys.path.insert(
     0,
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
+    os.path.join(BASE_DIR, "src")
 )
 
 from predict import load_model, preprocess_slice, predict as run_inference
@@ -38,8 +39,11 @@ REGION_COLORS = [
     "#A78BFA"
 ]
 
-OUTPUT_PATH = "outputs/last_prediction.png"
-os.makedirs("outputs", exist_ok=True)
+SAMPLE_DIR = os.path.join(BASE_DIR, "sample_data")
+OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
+OUTPUT_PATH = os.path.join(OUTPUT_DIR, "last_prediction.png")
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 @st.cache_resource
@@ -54,6 +58,7 @@ def show_image(image, title, overlay=None):
 
     if overlay is not None:
         cmap = mcolors.ListedColormap(REGION_COLORS)
+
         ax.imshow(
             overlay,
             cmap=cmap,
@@ -68,19 +73,14 @@ def show_image(image, title, overlay=None):
     return fig
 
 
-# -------------------------
 # Sidebar
-# -------------------------
 
 with st.sidebar:
 
     st.title("🧠 NeuroSeg")
-
     st.caption("Brain MRI Tumor Segmentation")
 
     st.divider()
-
-    st.subheader("Model")
 
     model = get_model()
 
@@ -88,6 +88,8 @@ with st.sidebar:
         p.numel()
         for p in model.parameters()
     )
+
+    st.subheader("Model")
 
     st.write("Architecture: U-Net")
     st.write(f"Parameters: {parameters / 1e6:.2f}M")
@@ -105,54 +107,107 @@ with st.sidebar:
     st.divider()
 
     st.caption("Dataset: BraTS2020")
-    st.caption("Input format: .h5")
-    st.caption("Input size: 240 × 240 × 4")
+    st.caption("Input: .h5")
+    st.caption("Original size: 240 × 240 × 4")
     st.caption("Model input: 128 × 128")
 
 
-# -------------------------
 # Main
-# -------------------------
 
 st.title("Brain Tumor Segmentation")
 
 st.write(
-    "Upload a BraTS MRI slice to generate a tumor segmentation."
+    "Upload a BraTS MRI slice or try one of the validation samples."
 )
 
 st.divider()
 
 
-uploaded = st.file_uploader(
-    "Upload MRI slice",
-    type=["h5"]
+# Input selection
+
+input_mode = st.radio(
+    "Choose input",
+    ["Upload .h5", "Try Sample"],
+    horizontal=True
 )
 
 
-if uploaded is None:
+selected_file = None
+selected_name = None
 
-    st.info(
-        "Upload a .h5 BraTS slice containing the image and mask datasets."
+
+if input_mode == "Try Sample":
+
+    all_samples = {
+        "Sample 1 ": "sample_001.h5",
+        "Sample 2 ": "sample_002.h5",
+        "Sample 3 ": "sample_003.h5"
+    }
+
+    # Only list samples that actually exist, so the dropdown
+    # never offers a file that will fail after selection.
+    sample_files = {
+        name: filename
+        for name, filename in all_samples.items()
+        if os.path.exists(os.path.join(SAMPLE_DIR, filename))
+    }
+
+    if not sample_files:
+        st.error(
+            f"No sample files found in '{SAMPLE_DIR}'."
+        )
+        st.stop()
+
+    selected_name = st.selectbox(
+        "Validation sample",
+        list(sample_files.keys())
     )
 
-    st.stop()
+    selected_file = os.path.join(
+        SAMPLE_DIR,
+        sample_files[selected_name]
+    )
 
 
-# -------------------------
+else:
+
+    uploaded = st.file_uploader(
+        "Upload MRI slice",
+        type=["h5"]
+    )
+
+    if uploaded is None:
+
+        st.info(
+            "Upload a .h5 BraTS slice containing the image dataset."
+        )
+
+        st.stop()
+
+
 # Load and predict
-# -------------------------
 
 try:
 
-    with tempfile.NamedTemporaryFile(
-        suffix=".h5",
-        delete=False
-    ) as tmp:
+    if input_mode == "Try Sample":
 
-        tmp.write(uploaded.read())
-        tmp_path = tmp.name
+        image_tensor, label, image = preprocess_slice(
+            selected_file
+        )
 
-    image_tensor, label, image = preprocess_slice(tmp_path)
+    else:
+
+        with tempfile.NamedTemporaryFile(
+            suffix=".h5",
+            delete=False
+        ) as tmp:
+
+            tmp.write(uploaded.read())
+            tmp_path = tmp.name
+
+        image_tensor, label, image = preprocess_slice(
+            tmp_path
+        )
 
     prediction = run_inference(
         model,
@@ -161,13 +216,12 @@ try:
 
 finally:
 
-    if "tmp_path" in locals() and os.path.exists(tmp_path):
-        os.remove(tmp_path)
+    if input_mode == "Upload .h5":
+        if "tmp_path" in locals() and os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 
-# -------------------------
 # MRI image
-# -------------------------
 
 base = image[..., 1]
 
@@ -177,7 +231,10 @@ base = (
 )
 
 
+# Results
+
 st.subheader("Segmentation")
+
 
 if label is not None:
 
@@ -243,9 +300,7 @@ if label is not None:
         plt.close(fig)
 
 
-# -------------------------
 # Metrics
-# -------------------------
 
 if label is not None:
 
@@ -291,23 +346,34 @@ else:
     )
 
 
-# -------------------------
 # Region distribution
-# -------------------------
 
 st.subheader("Tumor Region Distribution")
 
 total_pixels = prediction.size
 
+percentages = {}
+
 for class_id in range(1, 4):
 
-    percentage = (
+    percentages[class_id] = float(
         (prediction == class_id).sum()
         / total_pixels
         * 100
     )
 
-    width = min(max(percentage, 0), 100)
+for class_id in range(1, 4):
+
+    percentage = percentages[class_id]
+
+    # Real tumor regions are often a tiny slice of the image, so a
+    # literal width can round to 0px and look "missing" even though
+    # the value is correct. Floor nonzero values to a visible sliver.
+    if percentage <= 0:
+        width = 0
+    else:
+        width = max(percentage, 1.5)
+
     color = REGION_COLORS[class_id]
 
     st.markdown(
@@ -318,20 +384,32 @@ for class_id in range(1, 4):
                 <span>{REGION_NAMES[class_id]}</span>
                 <span>{percentage:.2f}%</span>
             </div>
-            <div style="background:#1f2630; border-radius:4px;
-                        height:8px; width:100%;">
-                <div style="background:{color}; width:{width}%;
-                            height:8px; border-radius:4px;"></div>
+
+            <div style="background:#1f2630;
+                        height:8px;
+                        width:100%;
+                        border-radius:2px;">
+                <div style="background:{color};
+                            width:{width}%;
+                            height:8px;
+                            border-radius:2px;">
+                </div>
             </div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
+if all(p == 0 for p in percentages.values()):
+    st.caption(
+        "All regions show 0% — this usually means `prediction` isn't "
+        "class-labeled (still raw logits/softmax instead of an "
+        "argmaxed 0-3 array). Worth checking the output of `predict()` "
+        "in predict.py."
+    )
 
-# -------------------------
+
 # Download
-# -------------------------
 
 st.subheader("Export")
 
@@ -355,6 +433,6 @@ with open(OUTPUT_PATH, "rb") as file:
     st.download_button(
         "Download Prediction",
         file,
-        file_name=f"{uploaded.name}_prediction.png",
+        file_name="prediction.png",
         mime="image/png"
     )
