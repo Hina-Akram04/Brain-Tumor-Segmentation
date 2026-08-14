@@ -174,8 +174,9 @@ else:
     st.info("No ground-truth mask found. Metrics are unavailable for this file.")
 
 
-# Region distribution — native st.progress instead of custom HTML,
-# since indented multi-line HTML gets misread by Markdown as a code block.
+# Region distribution — flush-left HTML (no leading indentation),
+# since indented multi-line strings get misread by Markdown as a code block.
+# That indentation was *also* why the earlier version silently failed to render.
 
 st.subheader("Tumor Region Distribution")
 
@@ -187,8 +188,21 @@ percentages = {
 
 for class_id in range(1, 4):
     pct = percentages[class_id]
-    st.write(f"{REGION_NAMES[class_id]} — {pct:.2f}%")
-    st.progress(min(int(round(pct)), 100))
+    width = 0 if pct <= 0 else max(pct, 1.5)
+    color = REGION_COLORS[class_id]
+
+    bar_html = (
+        f'<div style="margin-bottom:14px;">'
+        f'<div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px;">'
+        f'<span>{REGION_NAMES[class_id]}</span><span>{pct:.2f}%</span>'
+        f'</div>'
+        f'<div style="background:#1f2630;height:8px;width:100%;border-radius:2px;">'
+        f'<div style="background:{color};width:{width}%;height:8px;border-radius:2px;"></div>'
+        f'</div>'
+        f'</div>'
+    )
+
+    st.markdown(bar_html, unsafe_allow_html=True)
 
 if all(p == 0 for p in percentages.values()):
     st.caption(
