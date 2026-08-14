@@ -29,6 +29,11 @@ BrainTumorSegmentation/
 │
 ├── models/
 │   └── best_model.pth
+│   
+├── sample_data/
+│   ├── sample_001.h5
+│   ├── sample_002.h5
+│   └── sample_003.h5
 │
 ├── outputs/
 │   ├── last_prediction.png
