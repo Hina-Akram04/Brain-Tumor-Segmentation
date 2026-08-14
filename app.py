@@ -58,7 +58,7 @@ with st.sidebar:
     st.write("Architecture: U-Net")
     st.write(f"Parameters: {parameters / 1e6:.2f}M")
     st.write("Input: 4 MRI modalities")
-    st.write("Output: 4 classes")
+    st.write("Output: 4 classes (3 tumor regions)")
     st.divider()
 
     st.subheader("Tumor regions")
@@ -76,7 +76,7 @@ with st.sidebar:
 # Main
 
 st.title("Brain Tumor Segmentation")
-st.write("Upload a BraTS MRI slice or try one of the validation samples.")
+st.write("Upload a BraTS MRI slice or try one of the samples.")
 st.divider()
 
 input_mode = st.radio("Choose input", ["Upload .h5", "Try Sample"], horizontal=True)
