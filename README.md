@@ -1,6 +1,6 @@
 # Brain Tumor Segmentation (BraTS)
 
-A U-Net model that segments brain tumors from MRI slices into three sub-regions — necrotic core (NCR/NET), edema, and enhancing tumor. Built and trained on CPU using a 2,300-slice subset of the BraTS2020 dataset. Includes a Streamlit app for uploading a slice and viewing the segmentation.
+A U-Net model that segments brain tumors from MRI slices into three sub-regions: necrotic core (NCR/NET), edema and enhancing tumor. Built and trained on CPU using a 2,300-slice subset of the BraTS2020 dataset. Includes a Streamlit app for uploading a slice and viewing the segmentation.
 
 ## How it works
 
